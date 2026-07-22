@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import {
   convertToExcalidrawElements,
@@ -10,6 +10,7 @@ import { useAgentChat } from "@cloudflare/ai-chat/react";
 import Canvas from "./components/Canvas";
 import ChatPanel from "./components/chat/ChatPanel";
 import "./App.css";
+
 
 // One agent instance per page load. The canvas state lives only in the
 // browser, so persisting chat history across refreshes would leave a dead
@@ -36,7 +37,16 @@ export default function App() {
   // useAgentChat manages the chat protocol on top of the agent connection.
   // It gives us the messages array, a sendMessage function, and a status.
   const { messages, sendMessage, status } = useAgentChat({ agent });
-
+  const sendWithCanvas = useMemo(() => (msg: { role: 'user', parts: { type: 'text', text: string }[]}) => {
+    const elements = excalidrawAPI?.getSceneElements() ?? []
+    sendMessage({
+      ...msg, 
+      parts: [
+        ...msg.parts,
+        {type: 'data-canvas-state', data: {elements}}
+      ]
+    })
+  }, [sendMessage, excalidrawAPI])
   // Watch messages for tool outputs and apply them to the canvas. We handle
   // both tools the agent has: generateDiagram (replace canvas) and
   // modifyDiagram (patch a single existing element by id).
@@ -108,7 +118,7 @@ export default function App() {
       </div>
       <ChatPanel
         messages={messages}
-        sendMessage={sendMessage}
+        sendMessage={sendWithCanvas}
         status={status}
       />
       <a href="#viewer" className="viewer-launch" title="Open diagram viewer for human scoring">
